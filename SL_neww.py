@@ -90,7 +90,13 @@ def prepare_data(df):
     df['Position'] = random.choices(['Forward', 'Midfielder', 'Defender'], k=len(df))
     df['Transfer_Chance'] = df['Market_Value_SAR'].apply(lambda x: random.uniform(0.6, 0.95))
 
+    # Required columns for model
     features = ['xG', 'Assists', 'Goals', 'Dribbles', 'Interceptions', 'Passing Accuracy', 'Market_Value_SAR']
+    missing_cols = [col for col in features if col not in df.columns]
+    if missing_cols:
+        st.error(f"❌ Missing required columns: {missing_cols}")
+        st.stop()
+
     X = df[features]
     y = df['Market_Value_SAR'] * random.uniform(1.05, 1.15)
     model = train_model(X, y)
@@ -98,6 +104,7 @@ def prepare_data(df):
     df['Predicted_Year_2'] = df['Predicted_Year_1'] * 1.05
     df['Predicted_Year_3'] = df['Predicted_Year_2'] * 1.05
     return df
+
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
