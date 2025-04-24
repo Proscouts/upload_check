@@ -20,7 +20,9 @@ st.markdown("""
 .card {
     background: #FFF; border-radius: 12px; padding: 20px;
     margin: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    width: 300px; display: inline-block; vertical-align: top;
 }
+.card img { border-radius: 6px; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -52,35 +54,55 @@ def push_verified_data_to_github(df):
 def get_cached_github_db():
     return fetch_verified_data_from_github()
 
-# === GPT Full Stats Verification ===
+# === GPT Verification ===
 def verify_player_fully(player):
-    prompt = f"""Verify the following football player stats based on online sources like Transfermarkt or FBref. Return one sentence confirming if they are plausible or not. Format: "Verified: Yes/No - Reason".
+    prompt = f"""Verify the following football player stats based on online sources like Transfermarkt or FBref. Return one word: Verified, Partially Verified, or Unverified.
 
 Player: {player['Player Name']}
 Team: {player['Team Name']}
 Age: {player['Age']}
-Goals: {player['Goals']}, Assists: {player['Assists']}, xG: {player['xG']}, Interceptions: {player['Interceptions']}, Minutes: {player['Minutes']}
-Passing Accuracy: {player['Passing Accuracy']}%
-Asking Price (EUR): {player['Player Asking Price (EUR)']}"""
+Goals: {player['Goals']}, Assists: {player['Assists']}, xG: {player['xG']}, Interceptions: {player['Interceptions']}
+Minutes: {player['Minutes']}, Passing Accuracy: {player['Passing Accuracy']}%
+Asking Price: {player['Player Asking Price (EUR)']}"""
 
     try:
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=[
-                {"role": "system", "content": "You are a football scout. No disclaimers, just evaluate."},
+                {"role": "system", "content": "You are a football scout. Only reply with: Verified, Partially Verified, or Unverified."},
                 {"role": "user", "content": prompt}
             ]
         )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip().lower()
+        if "partially" in result:
+            return "Partially Verified"
+        elif "verified" in result:
+            return "Verified"
+        else:
+            return "Unverified"
     except:
-        return "Unverified - Error checking source"
+        return "Unverified - AI Error"
+
+# === Generate HTML Player Card
+def render_player_card(player):
+    image_url = f"https://robohash.org/{player['Player Name'].replace(' ', '')}.png?set=set2"
+    return f"""
+    <div class='card'>
+        <h4>{player['Player Name']}</h4>
+        <img src="{image_url}" width="100">
+        <p><strong>Club:</strong> {player['Team Name']}</p>
+        <p><strong>Asking Price:</strong> €{int(player['Player Asking Price (EUR)']):,}</p>
+        <p><strong>Verified:</strong> {player['Verified']}</p>
+        <p><strong>Source:</strong> {player['Source']}</p>
+    </div>
+    """
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
 df = None
 st.title("⚽ Football Talent Evaluator")
 
-# === Manual Input Form ===
+# === Manual Form Input
 with st.form("manual_input"):
     name = st.text_input("Player Name")
     team = st.text_input("Team Name", value="Free Agent")
@@ -106,9 +128,12 @@ if save_button:
     df['Source'] = team
     player_db = pd.concat([player_db, df], ignore_index=True)
     push_verified_data_to_github(player_db)
-    st.success("✅ Player Data Saved")
+    st.success("✅ Player verified and saved to GitHub")
 
-# === Upload CSV Block
+    # Show player card
+    st.markdown(render_player_card(df.iloc[0]), unsafe_allow_html=True)
+
+# === CSV Upload Block
 uploaded = st.file_uploader("📁 Upload Player CSV", type=["csv"])
 if uploaded:
     df_u = pd.read_csv(uploaded)
@@ -132,6 +157,7 @@ if uploaded:
                 row['Verified'] = verify_player_fully(row)
                 row['Source'] = row['Team Name']
                 player_db = pd.concat([player_db, pd.DataFrame([row])], ignore_index=True)
+                st.markdown(render_player_card(row), unsafe_allow_html=True)
                 updated = True
         if updated:
             push_verified_data_to_github(player_db)
@@ -146,6 +172,6 @@ if search_name:
     filtered = player_db[player_db['Player Name'].str.contains(search_name, case=False, na=False)]
     st.dataframe(filtered, height=200) if not filtered.empty else st.warning("No player found.")
 
-# === Final GitHub-Only Database View
-st.subheader("📊 Sample Player Data")
+# === Final GitHub View
+st.subheader("📊 All Verified Players from Database")
 st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True), height=300)
