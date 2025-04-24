@@ -146,5 +146,6 @@ if search_name:
     filtered = player_db[player_db['Player Name'].str.contains(search_name, case=False, na=False)]
     st.dataframe(filtered, height=200) if not filtered.empty else st.warning("No player found.")
 
+# === Final GitHub-Only Database View
 st.subheader("📊 All Verified Players from GitHub")
 st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True), height=300)
