@@ -162,22 +162,41 @@ if submitted:
 uploaded_file = st.file_uploader("📁 Upload Player CSV", type=["csv"])
 if uploaded_file:
     uploaded_df = pd.read_csv(uploaded_file)
-    df = prepare_data(uploaded_df)
-    for _, row in uploaded_df.iterrows():
-        pname = row['player_name']
-        if pname not in player_db['Player Name'].values:
-            verified = verify_with_openai(pname, row['Player Asking Price (EUR)'])
-            entry = {
-                'Player Name': pname, 'Team Name': row['team_name'], 'Age': row['age'],
-                'Goals': row['player_match_goals'], 'Assists': row['player_match_assists'],
-                'Dribbles': row['player_match_dribbles'], 'Interceptions': row['player_match_interceptions'],
-                'xG': row['player_match_np_xg'], 'Passing Accuracy': row['player_match_passing_ratio'],
-                'Minutes': row['player_match_minutes'], 'Player Asking Price (EUR)': row['Player Asking Price (EUR)'],
-                'Verified': verified
-            }
-            player_db = pd.concat([player_db, pd.DataFrame([entry])], ignore_index=True)
-    push_verified_data_to_github(player_db)
-    st.success("✅ Players uploaded and verified.")
+
+    # 🔁 Normalize column names for flexibility
+    uploaded_df.columns = uploaded_df.columns.str.strip().str.replace('_', ' ').str.title()
+
+    # 🧠 Handle legacy market value column
+    if 'Market Value (Eur)' in uploaded_df.columns and 'Player Asking Price (Eur)' not in uploaded_df.columns:
+        uploaded_df['Player Asking Price (EUR)'] = uploaded_df['Market Value (Eur)']
+
+    if 'Player Asking Price (EUR)' not in uploaded_df.columns:
+        st.error("❌ 'Player Asking Price (EUR)' column is required.")
+    else:
+        df = prepare_data(uploaded_df)
+        updated = False
+
+        for _, row in uploaded_df.iterrows():
+            pname = row['player_name'] if 'player_name' in row else row['Player Name']
+            if pname not in player_db['Player Name'].values:
+                verified = verify_with_openai(pname, row['Player Asking Price (EUR)'])
+                entry = {
+                    'Player Name': pname, 'Team Name': row['team_name'], 'Age': row['age'],
+                    'Goals': row['player_match_goals'], 'Assists': row['player_match_assists'],
+                    'Dribbles': row['player_match_dribbles'], 'Interceptions': row['player_match_interceptions'],
+                    'xG': row['player_match_np_xg'], 'Passing Accuracy': row['player_match_passing_ratio'],
+                    'Minutes': row['player_match_minutes'], 'Player Asking Price (EUR)': row['Player Asking Price (EUR)'],
+                    'Verified': verified
+                }
+                player_db = pd.concat([player_db, pd.DataFrame([entry])], ignore_index=True)
+                updated = True
+
+        if updated:
+            push_verified_data_to_github(player_db)
+            st.success("✅ New players uploaded and verified.")
+        else:
+            st.info("ℹ️ All uploaded players already exist in the database.")
+
 
 # === Show Player Profile
 if df is not None and not df.empty:
