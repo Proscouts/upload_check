@@ -54,51 +54,45 @@ def get_cached_github_db():
 
 # === GPT Full Stats Verification ===
 def verify_player_fully(player):
-    prompt = f"""Verify the following football player's performance stats and asking price using Transfermarkt or FBref. 
-Reply using the format:
-Matched Stats: [Goals, Assists, xG, Interceptions, Minutes, Passing Accuracy]
-Confidence: High/Medium/Low
+    prompt = f"""
+You are a football scout evaluating whether the following player stats seem realistic based on Transfermarkt, FBref or similar public sources.
 
-Player: {player['Player Name']}
+Return your answer in this format:
+Player Info:
+Name: {player['Player Name']}
 Team: {player['Team Name']}
 Age: {player['Age']}
 Goals: {player['Goals']}
 Assists: {player['Assists']}
 xG: {player['xG']}
 Interceptions: {player['Interceptions']}
-Minutes Played: {player['Minutes']}
+Minutes: {player['Minutes']}
 Passing Accuracy: {player['Passing Accuracy']}%
-Asking Price: €{player['Player Asking Price (EUR)']}
+Asking Price (EUR): {player['Player Asking Price (EUR)']}
 """
-
     try:
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=[
-                {"role": "system", "content": "You are a trusted football scout. Don't include disclaimers."},
+                {"role": "system", "content": "You are a strict and smart football scout. No disclaimers."},
                 {"role": "user", "content": prompt}
             ]
         )
-        content = response.choices[0].message.content.strip().lower()
 
-        matched = sum([
-            "goals" in content,
-            "assists" in content,
-            "xg" in content,
-            "interceptions" in content,
-            "minutes" in content,
-            "passing accuracy" in content,
+        result = response.choices[0].message.content.strip().lower()
+        counts = sum([
+            int(rating.split(":")[1].strip()) >= 7
+            for line in result.splitlines()
+            if any(stat in line for stat in ['goals', 'assists', 'xg', 'interceptions', 'minutes', 'passing accuracy'])
+            for rating in [line]
         ])
 
-        if matched >= 5:
+        if counts >= 4:
             return "Verified"
-        elif matched >= 2:
+        elif counts >= 2:
             return "Partially Verified"
         else:
             return "Unverified"
-    except:
-        return "Unverified - Error checking source"
-
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
