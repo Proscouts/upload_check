@@ -243,48 +243,50 @@ if search_name:
         st.warning("No player found with that name.")
 
 # === 📊 Display All Verified Players
-st.subheader("📊 All Verified Players from GitHub Database")
-st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True))
+    st.subheader("📊 All Verified Players from GitHub Database")
+    st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True))
 
-st.markdown("### 🧠 Player Attitude Summary (AI-Generated)")
-comment = f"{player['Player Name']} has been showing impactful performances with key contributions in recent matches."
+    st.markdown("### 🧠 Player Attitude Summary (AI-Generated)")
+    comment = f"{player['Player Name']} has been showing impactful performances with key contributions in recent matches."
 
-sentiment_prompt = [
+    sentiment_prompt = [
         {"role": "system", "content": "You are a football sentiment expert. Classify the tone of the comment as Positive, Neutral, or Negative."},
         {"role": "user", "content": comment}
     ]
-summary_prompt = [
+    summary_prompt = [
         {"role": "system", "content": "You're a football scout. Write a one-line summary of this player's recent performance."},
         {"role": "user", "content": comment}
     ]
-def get_icon(text):
+
+    def get_icon(text):
         return ("🔴", "Negative") if "negative" in text.lower() else (
                ("🟢", "Positive") if "positive" in text.lower() else
                ("🟡", "Neutral") if "neutral" in text.lower() else ("⚪", "Unclear"))
-               
-try:
-sentiment_response = client.chat.completions.create(
+
+    try:
+        sentiment_response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=sentiment_prompt
         )
-sentiment_text = sentiment_response.choices[0].message.content.strip()
-emoji, mood = get_icon(sentiment_text)
+        sentiment_text = sentiment_response.choices[0].message.content.strip()
+        emoji, mood = get_icon(sentiment_text)
 
-summary_response = client.chat.completions.create(
+        summary_response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=summary_prompt
         )
-summary_text = summary_response.choices[0].message.content.strip()
-except Exception as e:
+        summary_text = summary_response.choices[0].message.content.strip()
+    except Exception as e:
         emoji, mood, sentiment_text, summary_text = "⚪", "Unavailable", "Unable to classify sentiment.", "Summary not available."
         st.warning(f"⚠️ AI fallback triggered: {e}")
-        st.markdown(f"""
+
+    st.markdown(f'''
     <div class='card'>
-        <h4>🗨️ Comment Context:</h4>
+        <h4>Comment Context:</h4>
         <p><em>{comment}</em></p>
-        <h4>📊 Sentiment:</h4>
+        <h4>Sentiment:</h4>
         <p><strong>{emoji} {mood}</strong> – {sentiment_text}</p>
-        <h4>🤖 Scout Summary:</h4>
+        <h4>Scout Summary:</h4>
         <p>{summary_text}</p>
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
