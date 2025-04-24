@@ -187,7 +187,11 @@ if df is not None and not df.empty:
         <p><strong>Team:</strong> {player['Team Name']}</p>
         <p><strong>Age:</strong> {player['age']}</p>
         <p><strong>Asking Price:</strong> €{player['Player Asking Price (EUR)']:,.0f}</p>
-        <p><strong>Verified Info:</strong> {player_db[player_db['Player Name'] == player['Player Name']]['Verified'].values[0]}</p>
+        <p><strong>Verified Info:</strong> {
+    player_db[player_db['Player Name'] == player['Player Name']]['Verified'].values[0]
+    if not player_db[player_db['Player Name'] == player['Player Name']].empty else 'Not Verified'
+}</p>
+
         <p><strong>Best Fit Club:</strong> {player['Best_Fit_Club']}</p>
     </div>
     """, unsafe_allow_html=True)
