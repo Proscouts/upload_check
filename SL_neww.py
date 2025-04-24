@@ -29,12 +29,13 @@ div[data-testid="stDataFrame"] div[row] {
 }
 /* 👇 Shrink form width */
 .form-box {
-    max-width: 10px;  /* Reduced from 500px */
+    max-width: 350px;  /* ✅ Actually visible and compact */
     margin: auto;
     padding: 10px 20px;
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 # === GitHub Functions ===
 def fetch_verified_data_from_github():
