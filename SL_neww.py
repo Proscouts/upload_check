@@ -9,11 +9,10 @@ import json
 from openai import OpenAI
 from sklearn.ensemble import RandomForestRegressor
 
-# ========== CONFIG ==========
 st.set_page_config(page_title="Football Talent Evaluator", layout="wide")
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ========== STYLE ==========
+# ========== STYLING ==========
 st.markdown("""
 <style>
 #MainMenu, header, footer {visibility: hidden;}
@@ -39,7 +38,7 @@ def fetch_verified_data_from_github():
         return pd.read_csv(pd.compat.StringIO(content.decode()))
     return pd.DataFrame(columns=[
         'Player Name', 'Team Name', 'Age', 'Goals', 'Assists', 'Dribbles',
-        'Interceptions', 'xG', 'Passing Accuracy', 'Minutes', 'Market Value (EUR)',
+        'Interceptions', 'xG', 'Passing Accuracy', 'Minutes', 'Player Asking Price (EUR)',
         'Verified'
     ])
 
@@ -62,10 +61,10 @@ def push_verified_data_to_github(df):
     return push_resp.status_code in [200, 201]
 
 # ========== GPT VERIFICATION ==========
-def verify_with_openai(player_name, market_value):
+def verify_with_openai(player_name, asking_price):
     prompt = (
         f"What is the approximate current market value of football player {player_name}? "
-        f"Compare with {market_value} EUR and assess if it seems realistic."
+        f"Compare with {asking_price} EUR and assess if it's realistic."
     )
     try:
         response = client.chat.completions.create(
@@ -88,7 +87,8 @@ def prepare_data(df):
         'player_match_np_xg': 'xG', 'player_match_passing_ratio': 'Passing Accuracy',
         'player_match_minutes': 'Minutes'
     })
-    df['Market_Value_SAR'] = df['Market Value (EUR)'] * 3.75
+    df['Player Asking Price (EUR)'] = df['Player Asking Price (EUR)'].astype(float)
+    df['Market_Value_SAR'] = df['Player Asking Price (EUR)'] * 3.75
     df['Asking_Price_SAR'] = df['Market_Value_SAR'] * np.random.uniform(1.05, 1.2, size=len(df))
     df['Image'] = df['Player Name'].apply(lambda n: f"https://robohash.org/{n.replace(' ', '')}.png?set=set2")
     df['Best_Fit_Club'] = df['Team Name'].apply(lambda _: random.choice(['Man United', 'PSG', 'Al Hilal']))
@@ -96,7 +96,6 @@ def prepare_data(df):
     df['Position'] = random.choices(['Forward', 'Midfielder', 'Defender'], k=len(df))
     df['Transfer_Chance'] = df['Market_Value_SAR'].apply(lambda x: random.uniform(0.6, 0.95))
 
-    # Train quick regressor
     features = ['xG', 'Assists', 'Goals', 'Dribbles', 'Interceptions', 'Passing Accuracy', 'Market_Value_SAR']
     X = df[features]
     y = df['Market_Value_SAR'] * random.uniform(1.05, 1.15)
@@ -108,12 +107,13 @@ def prepare_data(df):
 
     return df
 
-# ========== MAIN ==========
+# ========== MAIN APP ==========
 st.title("⚽ Football Talent Evaluator")
-st.markdown("Upload a player CSV or manually evaluate one:")
+st.markdown("Upload a CSV or evaluate a player manually.")
 
 player_db = fetch_verified_data_from_github()
 df = None
+already_in_db = False
 
 # === Manual Form
 with st.form("manual_input"):
@@ -127,53 +127,59 @@ with st.form("manual_input"):
     xg = st.number_input("xG", 0.0, 5.0)
     passing = st.number_input("Passing Accuracy (%)", 0.0, 100.0)
     minutes = st.number_input("Minutes Played", 0, 120)
-    market_val = st.number_input("Market Value (EUR)", 10000, 10000000, step=10000)
+    asking_price = st.number_input("Player Asking Price (EUR)", 10000, 10000000, step=10000)
     submitted = st.form_submit_button("Evaluate Player")
 
 if submitted:
+    already_in_db = name in player_db['Player Name'].values
     manual_df = pd.DataFrame([{
         'player_name': name, 'team_name': team, 'age': age,
         'player_match_goals': goals, 'player_match_assists': assists,
         'player_match_dribbles': dribbles, 'player_match_interceptions': interceptions,
         'player_match_np_xg': xg, 'player_match_passing_ratio': passing,
-        'player_match_minutes': minutes, 'Market Value (EUR)': market_val
+        'player_match_minutes': minutes, 'Player Asking Price (EUR)': asking_price
     }])
     df = prepare_data(manual_df)
-    verified = verify_with_openai(name, market_val)
+    verified = verify_with_openai(name, asking_price)
+    if already_in_db:
+        verified += " (Already stored)"
 
-    # Update GitHub DB
-    row = {
+    new_row = {
         'Player Name': name, 'Team Name': team, 'Age': age, 'Goals': goals,
         'Assists': assists, 'Dribbles': dribbles, 'Interceptions': interceptions,
         'xG': xg, 'Passing Accuracy': passing, 'Minutes': minutes,
-        'Market Value (EUR)': market_val, 'Verified': verified
+        'Player Asking Price (EUR)': asking_price, 'Verified': verified
     }
     player_db = player_db[player_db['Player Name'] != name]
-    player_db = pd.concat([player_db, pd.DataFrame([row])], ignore_index=True)
+    player_db = pd.concat([player_db, pd.DataFrame([new_row])], ignore_index=True)
     push_verified_data_to_github(player_db)
 
-# === File Upload
-uploaded_file = st.file_uploader("📁 Or upload CSV", type=["csv"])
+# === Upload CSV
+uploaded_file = st.file_uploader("📁 Upload CSV", type=["csv"])
 if uploaded_file and not submitted:
     raw_df = pd.read_csv(uploaded_file)
     df = prepare_data(raw_df)
 
     for _, row in raw_df.iterrows():
-        verified = verify_with_openai(row['player_name'], row['Market_Value_EUR'])
+        already_in_db = row['player_name'] in player_db['Player Name'].values
+        verified = verify_with_openai(row['player_name'], row['Player Asking Price (EUR)'])
+        if already_in_db:
+            verified += " (Already stored)"
+
         entry = {
             'Player Name': row['player_name'], 'Team Name': row['team_name'], 'Age': row['age'],
             'Goals': row['player_match_goals'], 'Assists': row['player_match_assists'],
             'Dribbles': row['player_match_dribbles'], 'Interceptions': row['player_match_interceptions'],
             'xG': row['player_match_np_xg'], 'Passing Accuracy': row['player_match_passing_ratio'],
-            'Minutes': row['player_match_minutes'], 'Market Value (EUR)': row['Market_Value_EUR'],
+            'Minutes': row['player_match_minutes'], 'Player Asking Price (EUR)': row['Player Asking Price (EUR)'],
             'Verified': verified
         }
         player_db = player_db[player_db['Player Name'] != row['player_name']]
         player_db = pd.concat([player_db, pd.DataFrame([entry])], ignore_index=True)
     push_verified_data_to_github(player_db)
-    st.success("✅ Uploaded and verified")
+    st.success("✅ Players stored and verified")
 
-# === Display Player Card
+# === Display Player
 if df is not None and not df.empty:
     player = df.iloc[0]
     st.markdown(f"""
@@ -182,7 +188,7 @@ if df is not None and not df.empty:
         <img src="{player['Image']}" width="100">
         <p><strong>Club:</strong> {player['Team Name']}</p>
         <p><strong>Age:</strong> {player['age']}</p>
-        <p><strong>Market Value:</strong> €{player['Market Value (EUR)']:,.0f}</p>
+        <p><strong>Player Asking Price:</strong> €{player['Player Asking Price (EUR)']:,.0f}</p>
         <p><strong>Verified Info:</strong> {player_db[player_db['Player Name'] == player['Player Name']]['Verified'].values[0]}</p>
         <p><strong>Best Fit Club:</strong> {player['Best_Fit_Club']}</p>
     </div>
@@ -201,9 +207,10 @@ if df is not None and not df.empty:
     )
     st.altair_chart(chart, use_container_width=True)
 
-    # === AI Summary
     st.header("🧠 AI Summary")
     comment = f"{player['Player Name']} is showing promise with consistent performance."
+    if already_in_db:
+        comment += " Note: This player is already stored in the club's database."
     try:
         summary = client.chat.completions.create(
             model="gpt-4-1106-preview",
@@ -211,5 +218,4 @@ if df is not None and not df.empty:
         ).choices[0].message.content
     except:
         summary = "AI summary unavailable"
-
     st.markdown(f"<div class='card'><p>{summary}</p></div>", unsafe_allow_html=True)
