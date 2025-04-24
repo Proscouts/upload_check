@@ -75,9 +75,7 @@ def verify_with_openai(player_name, asking_price):
             ]
         )
         result = response.choices[0].message.content.strip()
-        if "unverified" in result.lower() or "no access" in result.lower():
-            return "Unverified"
-        return result
+        return result  # Always return the full AI output instead of just "Unverified"
     except:
         return "Unverified"
 # === Prepare Player Data ===
