@@ -118,7 +118,7 @@ with st.form("manual_input"):
     assists = st.number_input("Assists", 0, 1000)
     dribbles = st.number_input("Dribbles", 0, 100)
     interceptions = st.number_input("Interceptions", 0, 100)
-    xg = st.number_input("xG", 0.0, 5.0)
+    xg = st.number_input("xG", 0.0, 25.0)
     passing = st.number_input("Passing Accuracy (%)", 0.0, 100.0)
     minutes = st.number_input("Minutes Played", 0, 1200)
     price = st.number_input("Player Asking Price (EUR)", 10000, 10000000, step=10000)
