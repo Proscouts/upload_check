@@ -198,6 +198,7 @@ if uploaded:
 # === Forecast & Card ===
 if df is not None and not df.empty:
     player = df.iloc[0]
+
     st.markdown(f"""
     <div class='card'>
         <h3>{player['Player Name']} ({player['Position']})</h3>
@@ -214,6 +215,7 @@ if df is not None and not df.empty:
         "Predicted Value (SAR)": [player['Predicted_Year_1'], player['Predicted_Year_2'], player['Predicted_Year_3']],
         "Asking Price (SAR)": [player['Asking_Price_SAR']] * 3
     })
+
     st.altair_chart(
         alt.Chart(forecast).transform_fold(
             ['Predicted Value (SAR)', 'Asking Price (SAR)'],
@@ -222,30 +224,8 @@ if df is not None and not df.empty:
             x='Year:N', y='SAR Value:Q', color='Metric:N'
         ), use_container_width=True
     )
-# === 📥 Download Verified Player DB
-st.subheader("📥 Download Verified Player Database")
-st.download_button(
-    label="Download CSV",
-    data=player_db.to_csv(index=False),
-    file_name="Verified_Player_Database.csv",
-    mime="text/csv"
-)
 
-# === 🔍 Search Player
-st.subheader("🔍 Search Player from Database")
-search_name = st.text_input("Enter player name to search:")
-if search_name:
-    filtered_players = player_db[player_db['Player Name'].str.contains(search_name, case=False, na=False)]
-    if not filtered_players.empty:
-        st.success(f"✅ Found {len(filtered_players)} result(s).")
-        st.dataframe(filtered_players)
-    else:
-        st.warning("No player found with that name.")
-
-# === 📊 Display All Verified Players
-    st.subheader("📊 All Verified Players from GitHub Database")
-    st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True))
-
+    # === 🧠 AI Commentary Block ===
     st.markdown("### 🧠 Player Attitude Summary (AI-Generated)")
     comment = f"{player['Player Name']} has been showing impactful performances with key contributions in recent matches."
 
@@ -290,3 +270,26 @@ if search_name:
         <p>{summary_text}</p>
     </div>
     ''', unsafe_allow_html=True)
+# === 📥 Download Verified Player DB
+st.subheader("📥 Download Verified Player Database")
+st.download_button(
+    label="Download CSV",
+    data=player_db.to_csv(index=False),
+    file_name="Verified_Player_Database.csv",
+    mime="text/csv"
+)
+
+# === 🔍 Search Player
+st.subheader("🔍 Search Player from Database")
+search_name = st.text_input("Enter player name to search:")
+if search_name:
+    filtered_players = player_db[player_db['Player Name'].str.contains(search_name, case=False, na=False)]
+    if not filtered_players.empty:
+        st.success(f"✅ Found {len(filtered_players)} result(s).")
+        st.dataframe(filtered_players)
+    else:
+        st.warning("No player found with that name.")
+
+# === 📊 Display All Verified Players
+st.subheader("📊 All Verified Players from GitHub Database")
+st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True))
