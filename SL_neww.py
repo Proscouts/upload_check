@@ -133,22 +133,45 @@ if submitted:
     push_verified_data_to_github(player_db)
 
 # === Upload CSV Block ===
-uploaded = st.file_uploader("📁 Upload CSV", type=["csv"])
+# === Upload CSV Block ===
+uploaded = st.file_uploader("📁 Upload Player CSV", type=["csv"])
 if uploaded:
     df_u = pd.read_csv(uploaded)
+
+    # Normalize column names
     df_u.columns = df_u.columns.str.strip().str.replace('_', ' ').str.title()
+
+    # Try to fix weird formats of "asking price"
+    matches = [col for col in df_u.columns if 'asking price' in col.lower()]
+    if matches:
+        df_u.rename(columns={matches[0]: 'Player Asking Price (EUR)'}, inplace=True)
+
+    # Final check
     if 'Player Asking Price (EUR)' not in df_u.columns:
-        st.error("CSV must contain 'Player Asking Price (EUR)' column.")
+        st.error("❌ Could not detect 'Player Asking Price (EUR)' column.")
+        st.write("🧪 Columns found:", df_u.columns.tolist())
     else:
         df_u = prepare_data(df_u)
+        updated = False
         for _, row in df_u.iterrows():
             pname = row['Player Name']
             if pname not in player_db['Player Name'].values:
-                verified = verify_with_openai(pname, row['Player Asking Price (EUR)'])
+                # GPT verification with fallback
+                try:
+                    verified = verify_with_openai(pname, row['Player Asking Price (EUR)'])
+                    if "unverified" in verified.lower() or "no access" in verified.lower():
+                        verified = "Unverified"
+                except:
+                    verified = "Unverified"
+
                 row['Verified'] = verified
                 player_db = pd.concat([player_db, pd.DataFrame([row])], ignore_index=True)
-        push_verified_data_to_github(player_db)
-        st.success("✅ Upload successful!")
+                updated = True
+        if updated:
+            push_verified_data_to_github(player_db)
+            st.success("✅ Upload completed and players added.")
+        else:
+            st.info("ℹ️ No new players added — all are already in the database.")
 
 # === Forecast & Card ===
 if df is not None and not df.empty:
