@@ -106,7 +106,7 @@ if save_button:
     df['Source'] = team
     player_db = pd.concat([player_db, df], ignore_index=True)
     push_verified_data_to_github(player_db)
-    st.success("✅ Player verified and saved to GitHub.")
+    st.success("✅ Player Data Saved")
 
 # === Upload CSV Block
 uploaded = st.file_uploader("📁 Upload Player CSV", type=["csv"])
@@ -147,5 +147,5 @@ if search_name:
     st.dataframe(filtered, height=200) if not filtered.empty else st.warning("No player found.")
 
 # === Final GitHub-Only Database View
-st.subheader("📊 All Verified Players from GitHub")
+st.subheader("📊 Sample Player Data")
 st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True), height=300)
