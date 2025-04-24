@@ -57,7 +57,6 @@ def verify_player_fully(player):
     prompt = f"""
 You are a football scout evaluating whether the following player stats seem realistic based on Transfermarkt, FBref or similar public sources.
 
-Return your answer in this format:
 Player Info:
 Name: {player['Player Name']}
 Team: {player['Team Name']}
@@ -93,6 +92,8 @@ Asking Price (EUR): {player['Player Asking Price (EUR)']}
             return "Partially Verified"
         else:
             return "Unverified"
+    except Exception as e:
+        return "Unverified - AI Error"
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
