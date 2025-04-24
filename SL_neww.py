@@ -55,45 +55,34 @@ def get_cached_github_db():
 # === GPT Full Stats Verification ===
 def verify_player_fully(player):
     prompt = f"""
-You are a football scout evaluating whether the following player stats seem realistic based on Transfermarkt, FBref or similar public sources.
+Evaluate the realism of this player's stats using Transfermarkt or FBref as reference.
+Reply with a score from 1 to 10 for each stat. Only return the word "Verified", "Partially Verified", or "Unverified" based on how realistic they are.
 
-Player Info:
+Player:
 Name: {player['Player Name']}
 Team: {player['Team Name']}
 Age: {player['Age']}
-Goals: {player['Goals']}
-Assists: {player['Assists']}
-xG: {player['xG']}
-Interceptions: {player['Interceptions']}
-Minutes: {player['Minutes']}
-Passing Accuracy: {player['Passing Accuracy']}%
-Asking Price (EUR): {player['Player Asking Price (EUR)']}
+Goals: {player['Goals']}, Assists: {player['Assists']}, xG: {player['xG']}, Interceptions: {player['Interceptions']}
+Minutes: {player['Minutes']}, Passing Accuracy: {player['Passing Accuracy']}%
+Asking Price: {player['Player Asking Price (EUR)']}
 """
+
     try:
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=[
-                {"role": "system", "content": "You are a strict and smart football scout. No disclaimers."},
+                {"role": "system", "content": "You are a football scout. Only reply with one of these: Verified, Partially Verified, or Unverified."},
                 {"role": "user", "content": prompt}
             ]
         )
-
         result = response.choices[0].message.content.strip().lower()
-        counts = sum([
-            int(rating.split(":")[1].strip()) >= 7
-            for line in result.splitlines()
-            if any(stat in line for stat in ['goals', 'assists', 'xg', 'interceptions', 'minutes', 'passing accuracy'])
-            for rating in [line]
-        ])
-
-        if counts >= 4:
-            return "Verified"
-        elif counts >= 2:
+        if "partially" in result:
             return "Partially Verified"
+        elif "verified" in result:
+            return "Verified"
         else:
             return "Unverified"
     except Exception as e:
-        return "Unverified - AI Error"
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
