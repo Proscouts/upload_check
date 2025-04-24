@@ -23,6 +23,16 @@ st.markdown("""
     width: 300px; display: inline-block; vertical-align: top;
 }
 .card img { border-radius: 6px; margin-top: 10px; }
+div[data-testid="stDataFrame"] div[row] {
+    line-height: 1.2rem;
+    font-size: 0.85rem;
+}
+/* 👇 Shrink form width */
+.form-box {
+    max-width: 500px;
+    margin: auto;
+    padding: 10px 20px;
+}
 </style>
 """, unsafe_allow_html=True)
 
