@@ -29,7 +29,7 @@ div[data-testid="stDataFrame"] div[row] {
 }
 /* 👇 Shrink form width */
 .form-box {
-    max-width: 200px;  /* Reduced from 500px */
+    max-width: 10px;  /* Reduced from 500px */
     margin: auto;
     padding: 10px 20px;
 }
