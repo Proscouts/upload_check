@@ -246,8 +246,8 @@ if search_name:
 st.subheader("📊 All Verified Players from GitHub Database")
 st.dataframe(player_db.sort_values("Player Name").reset_index(drop=True))
 
-    st.markdown("### 🧠 Player Attitude Summary (AI-Generated)")
-    comment = f"{player['Player Name']} has been showing impactful performances with key contributions in recent matches."
+st.markdown("### 🧠 Player Attitude Summary (AI-Generated)")
+comment = f"{player['Player Name']} has been showing impactful performances with key contributions in recent matches."
 
     sentiment_prompt = [
         {"role": "system", "content": "You are a football sentiment expert. Classify the tone of the comment as Positive, Neutral, or Negative."},
