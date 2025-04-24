@@ -28,7 +28,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== GITHUB HELPERS ==========
+# ========== GITHUB DB HELPERS ==========
 def fetch_verified_data_from_github():
     url = f"https://api.github.com/repos/{st.secrets['GITHUB_REPO']}/contents/{st.secrets['GITHUB_FILE']}"
     headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"}
@@ -38,8 +38,7 @@ def fetch_verified_data_from_github():
         return pd.read_csv(pd.compat.StringIO(content.decode()))
     return pd.DataFrame(columns=[
         'Player Name', 'Team Name', 'Age', 'Goals', 'Assists', 'Dribbles',
-        'Interceptions', 'xG', 'Passing Accuracy', 'Minutes', 'Player Asking Price (EUR)',
-        'Verified'
+        'Interceptions', 'xG', 'Passing Accuracy', 'Minutes', 'Player Asking Price (EUR)', 'Verified'
     ])
 
 def push_verified_data_to_github(df):
@@ -57,8 +56,7 @@ def push_verified_data_to_github(df):
     if sha:
         data["sha"] = sha
 
-    push_resp = requests.put(url, headers=headers, data=json.dumps(data))
-    return push_resp.status_code in [200, 201]
+    requests.put(url, headers=headers, data=json.dumps(data))
 
 @st.cache_data(ttl=3600)
 def get_cached_github_db():
@@ -70,19 +68,19 @@ def train_model(X, y):
     model.fit(X, y)
     return model
 
-# ========== GPT WITH SOURCE ==========
+# ========== GPT VERIFICATION ==========
 def verify_with_openai(player_name, asking_price):
     prompt = (
-        f"What is the current estimated market value of football player {player_name} in EUR? "
-        f"Compare this with {asking_price} EUR. "
-        f"If available, mention the source of your estimate (e.g., Transfermarkt, FBref, etc.). "
-        f"Is the asking price realistic?"
+        f"You are a football scout with real-time access to market value databases like Transfermarkt. "
+        f"The player under review is {player_name} with an asking price of {asking_price} EUR. "
+        f"Compare with estimated value and cite a known source (e.g., Transfermarkt). "
+        f"Do not write any disclaimers. Keep response under 100 words."
     )
     try:
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=[
-                {"role": "system", "content": "You are a football transfer analyst."},
+                {"role": "system", "content": "You are a confident football scout. Avoid AI disclaimers."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -90,7 +88,7 @@ def verify_with_openai(player_name, asking_price):
     except:
         return "Verification unavailable."
 
-# ========== PREPARE DATA ==========
+# ========== DATA PREP ==========
 def prepare_data(df):
     df = df.rename(columns={
         'player_name': 'Player Name', 'team_name': 'Team Name',
@@ -104,7 +102,6 @@ def prepare_data(df):
     df['Asking_Price_SAR'] = df['Market_Value_SAR'] * np.random.uniform(1.05, 1.2, size=len(df))
     df['Image'] = df['Player Name'].apply(lambda n: f"https://robohash.org/{n.replace(' ', '')}.png?set=set2")
     df['Best_Fit_Club'] = df['Team Name'].apply(lambda _: random.choice(['Man United', 'PSG', 'Al Hilal']))
-    df['Nationality'] = "Egyptian"
     df['Position'] = random.choices(['Forward', 'Midfielder', 'Defender'], k=len(df))
     df['Transfer_Chance'] = df['Market_Value_SAR'].apply(lambda x: random.uniform(0.6, 0.95))
 
@@ -117,13 +114,12 @@ def prepare_data(df):
     df['Predicted_Year_3'] = df['Predicted_Year_2'] * 1.05
     return df
 
-# ========== MAIN ==========
+# ========== MAIN APP ==========
 st.title("⚽ Football Talent Evaluator")
 player_db = get_cached_github_db()
 df = None
-already_in_db = False
 
-# === Manual Form
+# === Manual Entry
 with st.form("manual_input"):
     name = st.text_input("Player Name")
     team = st.text_input("Team Name")
@@ -139,7 +135,6 @@ with st.form("manual_input"):
     submitted = st.form_submit_button("Evaluate Player")
 
 if submitted:
-    already_in_db = name in player_db['Player Name'].values
     manual_df = pd.DataFrame([{
         'player_name': name, 'team_name': team, 'age': age,
         'player_match_goals': goals, 'player_match_assists': assists,
@@ -148,34 +143,54 @@ if submitted:
         'player_match_minutes': minutes, 'Player Asking Price (EUR)': asking_price
     }])
     df = prepare_data(manual_df)
-
-    existing_verified = player_db[player_db['Player Name'] == name]['Verified']
-    if not existing_verified.empty:
-        verified = existing_verified.values[0]
+    existing = player_db[player_db['Player Name'] == name]
+    if not existing.empty:
+        verified = existing['Verified'].values[0]
     else:
         verified = verify_with_openai(name, asking_price)
-        new_row = {
+        player_row = {
             'Player Name': name, 'Team Name': team, 'Age': age, 'Goals': goals,
             'Assists': assists, 'Dribbles': dribbles, 'Interceptions': interceptions,
             'xG': xg, 'Passing Accuracy': passing, 'Minutes': minutes,
             'Player Asking Price (EUR)': asking_price, 'Verified': verified
         }
         player_db = player_db[player_db['Player Name'] != name]
-        player_db = pd.concat([player_db, pd.DataFrame([new_row])], ignore_index=True)
+        player_db = pd.concat([player_db, pd.DataFrame([player_row])], ignore_index=True)
         push_verified_data_to_github(player_db)
 
-# === Show Profile
+# === Upload Block
+uploaded_file = st.file_uploader("📁 Upload Player CSV", type=["csv"])
+if uploaded_file:
+    uploaded_df = pd.read_csv(uploaded_file)
+    df = prepare_data(uploaded_df)
+    for _, row in uploaded_df.iterrows():
+        pname = row['player_name']
+        if pname not in player_db['Player Name'].values:
+            verified = verify_with_openai(pname, row['Player Asking Price (EUR)'])
+            entry = {
+                'Player Name': pname, 'Team Name': row['team_name'], 'Age': row['age'],
+                'Goals': row['player_match_goals'], 'Assists': row['player_match_assists'],
+                'Dribbles': row['player_match_dribbles'], 'Interceptions': row['player_match_interceptions'],
+                'xG': row['player_match_np_xg'], 'Passing Accuracy': row['player_match_passing_ratio'],
+                'Minutes': row['player_match_minutes'], 'Player Asking Price (EUR)': row['Player Asking Price (EUR)'],
+                'Verified': verified
+            }
+            player_db = pd.concat([player_db, pd.DataFrame([entry])], ignore_index=True)
+    push_verified_data_to_github(player_db)
+    st.success("✅ Players uploaded and verified.")
+
+# === Show Player Profile
 if df is not None and not df.empty:
     player = df.iloc[0]
     st.markdown(f"""
     <div class='card'>
         <h3>{player['Player Name']} ({player['Position']})</h3>
         <img src="{player['Image']}" width="100">
-        <p><strong>Club:</strong> {player['Team Name']}</p>
+        <p><strong>Team:</strong> {player['Team Name']}</p>
         <p><strong>Age:</strong> {player['age']}</p>
         <p><strong>Asking Price:</strong> €{player['Player Asking Price (EUR)']:,.0f}</p>
-        <p><strong>Verified Info:</strong> {player_db[player_db['Player Name'] == player['Player Name']]['Verified'].values[0]}</p>
-        <p><strong>Best Fit Club:</strong> {player['Best_Fit_Club']}</p>
+        <p><strong>Verification:</strong> {player_db[player_db['Player Name'] == player['Player Name']]['Verified'].values[0]}</p>
+        <p><strong>Best Fit:</strong> {player['Best_Fit_Club']}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -184,22 +199,21 @@ if df is not None and not df.empty:
         "Predicted Value (SAR)": [player['Predicted_Year_1'], player['Predicted_Year_2'], player['Predicted_Year_3']],
         "Club Asking Price (SAR)": [player['Asking_Price_SAR']] * 3
     })
-    chart = alt.Chart(forecast_df).transform_fold(
-        ['Predicted Value (SAR)', 'Club Asking Price (SAR)'],
-        as_=['Metric', 'SAR Value']
-    ).mark_line(point=True).encode(
-        x='Year:N', y='SAR Value:Q', color='Metric:N'
+    st.altair_chart(
+        alt.Chart(forecast_df).transform_fold(
+            ['Predicted Value (SAR)', 'Club Asking Price (SAR)'],
+            as_=['Metric', 'SAR Value']
+        ).mark_line(point=True).encode(
+            x='Year:N', y='SAR Value:Q', color='Metric:N'
+        ), use_container_width=True
     )
-    st.altair_chart(chart, use_container_width=True)
 
     st.header("🧠 AI Summary")
-    comment = f"{player['Player Name']} is showing promise with consistent performance."
-    if already_in_db:
-        comment += " Note: This player is already stored in the club's database."
     try:
+        comment = f"{player['Player Name']} is a strong prospect based on recent data."
         summary = client.chat.completions.create(
             model="gpt-4-1106-preview",
-            messages=[{"role": "user", "content": f"Summarize this: {comment}"}]
+            messages=[{"role": "user", "content": f"Summarize this profile in 2 lines: {comment}"}]
         ).choices[0].message.content
     except:
         summary = "AI summary unavailable"
