@@ -54,26 +54,51 @@ def get_cached_github_db():
 
 # === GPT Full Stats Verification ===
 def verify_player_fully(player):
-    prompt = f"""Verify the following football player stats based on online sources like Transfermarkt or FBref. Return one sentence confirming if they are plausible or not. Format: "Verified: Yes/No - Reason".
+    prompt = f"""Verify the following football player's performance stats and asking price using Transfermarkt or FBref. 
+Reply using the format:
+Matched Stats: [Goals, Assists, xG, Interceptions, Minutes, Passing Accuracy]
+Confidence: High/Medium/Low
 
 Player: {player['Player Name']}
 Team: {player['Team Name']}
 Age: {player['Age']}
-Goals: {player['Goals']}, Assists: {player['Assists']}, xG: {player['xG']}, Interceptions: {player['Interceptions']}, Minutes: {player['Minutes']}
+Goals: {player['Goals']}
+Assists: {player['Assists']}
+xG: {player['xG']}
+Interceptions: {player['Interceptions']}
+Minutes Played: {player['Minutes']}
 Passing Accuracy: {player['Passing Accuracy']}%
-Asking Price (EUR): {player['Player Asking Price (EUR)']}"""
+Asking Price: €{player['Player Asking Price (EUR)']}
+"""
 
     try:
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=[
-                {"role": "system", "content": "You are a football scout. No disclaimers, just evaluate."},
+                {"role": "system", "content": "You are a trusted football scout. Don't include disclaimers."},
                 {"role": "user", "content": prompt}
             ]
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content.strip().lower()
+
+        matched = sum([
+            "goals" in content,
+            "assists" in content,
+            "xg" in content,
+            "interceptions" in content,
+            "minutes" in content,
+            "passing accuracy" in content,
+        ])
+
+        if matched >= 5:
+            return "Verified"
+        elif matched >= 2:
+            return "Partially Verified"
+        else:
+            return "Unverified"
     except:
         return "Unverified - Error checking source"
+
 
 # === Load GitHub DB
 player_db = get_cached_github_db()
