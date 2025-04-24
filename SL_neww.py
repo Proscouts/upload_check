@@ -139,7 +139,7 @@ if save_button:
     df['Source'] = team
     player_db = pd.concat([player_db, df], ignore_index=True)
     push_verified_data_to_github(player_db)
-    st.success("✅ Player verified and saved to GitHub")
+    st.success("✅ Player verified and saved to the Database")
 
     # Show player card
     st.markdown(render_player_card(df.iloc[0]), unsafe_allow_html=True)
