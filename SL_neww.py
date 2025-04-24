@@ -145,9 +145,24 @@ uploaded = st.file_uploader("📁 Upload Player CSV", type=["csv"])
 if uploaded:
     df_u = pd.read_csv(uploaded)
 
-    # Normalize column names
-    df_u.columns = df_u.columns.str.strip().str.replace('_', ' ').str.title()
+    # ✅ FIX: Normalize and match expected column names
+    column_map = {
+        'player name': 'Player Name',
+        'team name': 'Team Name',
+        'age': 'Age',
+        'goals': 'Goals',
+        'assists': 'Assists',
+        'dribbles': 'Dribbles',
+        'interceptions': 'Interceptions',
+        'xg': 'xG',
+        'passing accuracy': 'Passing Accuracy',
+        'minutes': 'Minutes',
+        'player asking price (eur)': 'Player Asking Price (EUR)'
+    }
+    df_u.columns = [col.strip().lower() for col in df_u.columns]
+    df_u.rename(columns=column_map, inplace=True)
 
+    # Continue with price column check and prepare_data
     # Try to fix weird formats of "asking price"
     matches = [col for col in df_u.columns if 'asking price' in col.lower()]
     if matches:
